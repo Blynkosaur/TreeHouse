@@ -5,9 +5,13 @@ import (
 	"strings"
 )
 
-type WorktreeEnvParser struct {
-	worktreeDirectory string
-	envVariables      map[string]string
+type File struct {
+	Path         string
+	envVariables map[string]string
+}
+
+func LoadPath(path string) (File, error) {
+	panic("nothing yet")
 }
 
 func Parse(envContent string) (map[string]string, error) {

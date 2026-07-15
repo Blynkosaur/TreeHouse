@@ -123,6 +123,14 @@ Documented worktree pains (research + Bryan's own usage history) and the story t
 - Sequencing rule: built AFTER the plain CLI core works (sessions 4–5, lipgloss styling as the session-3 bridge). The TUI is the roof, not the foundation.
 - Differentiation: nothing in the space has a live health dashboard (workz = static table). This is the README GIF.
 
+## Design decision — Progressive configuration (Bryan's call, 2026-07-14) 🎯
+
+**Zero-config mode is the default.** With no `treehouse.toml`, doctor still works end to end: required env keys inferred from `.env.example` (reported as WARN, not FAIL — inferred requirements get softer teeth), services inferred from docker-compose, git staleness needs nothing. Useful in any repo ten seconds after install.
+
+**`treehouse.toml` is a sharpener, not a gatekeeper.** It upgrades inferred warnings to curated failures (the human-judged required list) and carries the un-inferable: data/seed checks, fix commands, hydrate steps, migration commands. `init` bridges the two — generates the config from the inferences as a starting point.
+
+Build-order consequence: env checker v1 reads `.env.example` directly; the config package moves later (arrives with data checks).
+
 ## Non-goals (state in README)
 
 - Multi-machine sync (the original "Dropbox for devs" — dead)
