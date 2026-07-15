@@ -2,6 +2,8 @@ package envfile
 
 import (
 	"bufio"
+	"log"
+	"os"
 	"strings"
 )
 
@@ -11,7 +13,16 @@ type File struct {
 }
 
 func LoadPath(path string) (File, error) {
-	panic("nothing yet")
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	content := string(bytes)
+	varPairs, parseError := Parse(content)
+	if parseError != nil {
+		log.Fatal(err)
+	}
+	return File{path, varPairs}, err
 }
 
 func Parse(envContent string) (map[string]string, error) {
