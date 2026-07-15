@@ -2,6 +2,6 @@ package main
 
 import "github.com/Blynkosaur/treehouse/cmd"
 
-func main(){
+func main() {
 	cmd.Execute()
 }
