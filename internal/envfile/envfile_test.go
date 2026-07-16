@@ -14,7 +14,7 @@ type envVariableItem struct {
 var testItems = []envVariableItem{
 	{
 		name:  "simple pair",
-		input: "FOO=bar\nGOON=jork",
+		input: "FOO=bar\nSIX=seven",
 		want:  map[string]string{"FOO": "bar", "SIX": "seven"},
 	},
 	{
