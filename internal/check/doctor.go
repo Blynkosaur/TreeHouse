@@ -67,7 +67,13 @@ func (d Doctor) CheckEnv(w Worktree) []Finding {
 		}
 		f := Finding{Dir: dir, Keys: len(p.example.Vars)}
 		if p.env == nil {
+			// A nonexistent .env is missing every key the example names —
+			// recording them makes Finding lossless for hydrate planning.
 			f.NoEnv = true
+			for key := range p.example.Vars {
+				f.Missing = append(f.Missing, key)
+			}
+			sort.Strings(f.Missing)
 			findings = append(findings, f)
 			continue
 		}

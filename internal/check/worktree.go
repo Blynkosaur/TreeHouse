@@ -2,8 +2,12 @@
 package check
 
 import (
+	"errors"
+	"fmt"
 	"io/fs"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/Blynkosaur/treehouse/internal/envfile"
 )
@@ -78,4 +82,22 @@ func Discover(root string) (Worktree, error) {
 		return Worktree{}, walkErr
 	}
 	return wt, nil
+}
+
+// runs git worktree list --porcelain and returns the first one because that's how it works apparently
+func findMainWT(cwd string) (string, error) {
+	cmd := exec.Command("git", "wokrtree", "list", "--porcelain")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	mainWTPath := string(output)
+	if mainWTPath == "" {
+		return "", errors.New("No worktrees found")
+	}
+	splitVals := strings.Split(mainWTPath, " ")
+	if len(mainWTPath) < 2 {
+		return "", fmt.Errorf("worktree path out of range: %s", splitVals)
+	}
+	return splitVals[1], nil
 }
