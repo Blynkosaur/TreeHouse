@@ -105,6 +105,7 @@ var (
 func printTable(findings []check.Finding, root string) {
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
+		BorderRow(true).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
 				return headerStyle.Padding(0, 1)
