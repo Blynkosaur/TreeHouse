@@ -1,7 +1,10 @@
 package envfile
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -51,4 +54,72 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAppendPreservesOriginal(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	original := "# hand-written comment\nA=1\nB=custom # note\n"
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Append(path, map[string]string{"D": "4", "C": "3"}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	// THE regression test for the WriteFile-destroys-everything bug:
+	// every original byte must still open the file.
+	if !strings.HasPrefix(got, original) {
+		t.Fatalf("original content damaged!\ngot:\n%s", got)
+	}
+	if !strings.Contains(got, Marker) {
+		t.Error("appended block missing marker comment")
+	}
+	// Sorted, complete, and re-parseable.
+	if !strings.Contains(got, "C=3\nD=4\n") {
+		t.Errorf("appended keys wrong or unsorted:\n%s", got)
+	}
+	vars, _ := Parse(got)
+	if vars["A"] != "1" || vars["C"] != "3" || vars["D"] != "4" {
+		t.Errorf("round-trip parse lost keys: %v", vars)
+	}
+}
+
+func TestAppendCreatesWhenAbsent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := Append(path, map[string]string{"A": "1"}); err != nil {
+		t.Fatalf("Append to nonexistent file: %v", err)
+	}
+	vars, _ := Parse(readFile(t, path))
+	if vars["A"] != "1" {
+		t.Errorf("got %v", vars)
+	}
+}
+
+func TestCreateRefusesOverwrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte("PRECIOUS=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Create(path, map[string]string{"A": "1"}); err == nil {
+		t.Fatal("Create overwrote an existing file — must refuse")
+	}
+	if readFile(t, path) != "PRECIOUS=1\n" {
+		t.Error("existing file was modified")
+	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }
