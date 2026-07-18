@@ -56,16 +56,7 @@ func (d Doctor) CheckEnv(w, source Worktree) []Finding {
 
 	// Fallback reference: the main checkout's real .env vars, keyed by dir
 	// relative to its root so they map onto this worktree's dirs.
-	srcVars := map[string]map[string]string{}
-	for i := range source.EnvFiles {
-		f := &source.EnvFiles[i]
-		if filepath.Base(f.Path) != ".env" {
-			continue
-		}
-		if rel, err := filepath.Rel(source.Root, filepath.Dir(f.Path)); err == nil {
-			srcVars[rel] = f.Vars
-		}
-	}
+	srcVars := source.EnvVarsByDir()
 
 	// Candidate dirs: every dir with an env file here, plus every dir the main
 	// checkout has a .env for — so a service missing entirely in this worktree

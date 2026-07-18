@@ -24,17 +24,7 @@ type Repair struct {
 // keys would require in-place edits; they stay doctor's nag until v2.
 func (d Doctor) PlanHydrate(w, source Worktree) []Repair {
 	// Index the source's real .env vars by relative directory.
-	srcVars := map[string]map[string]string{}
-	for _, f := range source.EnvFiles {
-		if filepath.Base(f.Path) != ".env" {
-			continue
-		}
-		rel, err := filepath.Rel(source.Root, filepath.Dir(f.Path))
-		if err != nil {
-			continue
-		}
-		srcVars[rel] = f.Vars
-	}
+	srcVars := source.EnvVarsByDir()
 
 	var repairs []Repair
 	for _, finding := range d.CheckEnv(w, source) {

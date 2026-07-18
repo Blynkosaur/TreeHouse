@@ -83,6 +83,24 @@ func Discover(root string) (Worktree, error) {
 	return wt, nil
 }
 
+// EnvVarsByDir indexes this worktree's real .env files by directory relative to
+// its root: rel-dir → (key → value). Matching a service across worktrees (svc_a
+// here ↔ svc_a in main) is just a lookup on the shared relative key. Only .env
+// is indexed — .env.example is a reference, not a value source. Read by CheckEnv
+// (fallback reference), PlanHydrate (fill values), and make (generate examples).
+func (w Worktree) EnvVarsByDir() map[string]map[string]string {
+	byDir := map[string]map[string]string{}
+	for _, f := range w.EnvFiles {
+		if filepath.Base(f.Path) != ".env" {
+			continue
+		}
+		if rel, err := filepath.Rel(w.Root, filepath.Dir(f.Path)); err == nil {
+			byDir[rel] = f.Vars
+		}
+	}
+	return byDir
+}
+
 // MainWorktree returns the path of the repository's primary worktree — the
 // first entry `git worktree list` reports (git guarantees the main checkout
 // comes first). hydrate sources canonical env values from it. cwd selects the
