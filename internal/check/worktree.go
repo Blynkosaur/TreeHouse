@@ -3,7 +3,6 @@ package check
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os/exec"
 	"path/filepath"
@@ -84,20 +83,23 @@ func Discover(root string) (Worktree, error) {
 	return wt, nil
 }
 
-// runs git worktree list --porcelain and returns the first one because that's how it works apparently
-func findMainWT(cwd string) (string, error) {
-	cmd := exec.Command("git", "wokrtree", "list", "--porcelain")
+// MainWorktree returns the path of the repository's primary worktree — the
+// first entry `git worktree list` reports (git guarantees the main checkout
+// comes first). hydrate sources canonical env values from it. cwd selects the
+// repository to ask; it need not be the main worktree itself.
+func MainWorktree(cwd string) (string, error) {
+	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+	cmd.Dir = cwd
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
-	mainWTPath := string(output)
-	if mainWTPath == "" {
-		return "", errors.New("No worktrees found")
+	// Porcelain output is blank-line-separated blocks, each opening with a
+	// "worktree <path>" line. The first such line is the main worktree.
+	for _, line := range strings.Split(string(output), "\n") {
+		if path, ok := strings.CutPrefix(line, "worktree "); ok {
+			return path, nil
+		}
 	}
-	splitVals := strings.Split(mainWTPath, " ")
-	if len(mainWTPath) < 2 {
-		return "", fmt.Errorf("worktree path out of range: %s", splitVals)
-	}
-	return splitVals[1], nil
+	return "", errors.New("no worktrees found")
 }
