@@ -37,7 +37,7 @@ func (d Doctor) PlanHydrate(w, source Worktree) []Repair {
 	}
 
 	var repairs []Repair
-	for _, finding := range d.CheckEnv(w) {
+	for _, finding := range d.CheckEnv(w, source) {
 		if len(finding.Missing) == 0 {
 			continue // healthy, or only-empty drift (v2 territory)
 		}

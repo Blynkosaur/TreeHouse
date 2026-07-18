@@ -26,7 +26,8 @@ func TestCheckEnv(t *testing.T) {
 		},
 	}
 
-	findings := Doctor{}.CheckEnv(wt)
+	// No source worktree → .env.example is the only reference (old behavior).
+	findings := Doctor{}.CheckEnv(wt, Worktree{})
 
 	if len(findings) != 3 {
 		t.Fatalf("got %d findings, want 3 (a, b, c — d has no example): %+v", len(findings), findings)
@@ -47,5 +48,38 @@ func TestCheckEnv(t *testing.T) {
 
 	if !c.NoEnv || c.Keys != 2 {
 		t.Errorf("service c: NoEnv=%v Keys=%d, want NoEnv=true Keys=2", c.NoEnv, c.Keys)
+	}
+}
+
+// TestCheckEnvMainFallback: a repo with no .env.example anywhere. The main
+// checkout's .env is the reference for which keys should exist.
+func TestCheckEnvMainFallback(t *testing.T) {
+	wt := Worktree{
+		Root: "/wt",
+		EnvFiles: []envfile.File{
+			// svc_a: has .env but is missing DB_URL that main defines
+			{Path: "/wt/svc_a/.env", Vars: map[string]string{"PORT": "3000"}},
+			// svc_b: no .env at all — main has one, so this is NoEnv
+		},
+	}
+	source := Worktree{
+		Root: "/main",
+		EnvFiles: []envfile.File{
+			{Path: "/main/svc_a/.env", Vars: map[string]string{"PORT": "3000", "DB_URL": "postgres://x"}},
+			{Path: "/main/svc_b/.env", Vars: map[string]string{"TOKEN": "abc"}},
+		},
+	}
+
+	findings := Doctor{}.CheckEnv(wt, source)
+	if len(findings) != 2 {
+		t.Fatalf("got %d findings, want 2 (svc_a drift, svc_b NoEnv): %+v", len(findings), findings)
+	}
+	a, b := findings[0], findings[1] // dir-sorted: svc_a, svc_b
+
+	if !reflect.DeepEqual(a.Missing, []string{"DB_URL"}) {
+		t.Errorf("svc_a Missing = %v, want [DB_URL] (from main, no .env.example)", a.Missing)
+	}
+	if !b.NoEnv || !reflect.DeepEqual(b.Missing, []string{"TOKEN"}) {
+		t.Errorf("svc_b: NoEnv=%v Missing=%v, want NoEnv=true Missing=[TOKEN]", b.NoEnv, b.Missing)
 	}
 }

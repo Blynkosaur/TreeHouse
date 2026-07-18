@@ -37,7 +37,15 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	findings := check.Doctor{}.CheckEnv(wt)
+
+	// Reference for expected keys: a service's own .env.example, else the main
+	// checkout's .env. Outside a git repo there's no fallback — doctor still
+	// works from .env.example alone.
+	var source check.Worktree
+	if mainRoot, err := check.MainWorktree(root); err == nil {
+		source, _ = check.Discover(mainRoot)
+	}
+	findings := check.Doctor{}.CheckEnv(wt, source)
 
 	if lsMode {
 		printTable(findings, root)
@@ -70,7 +78,7 @@ func printReport(findings []check.Finding, root string) {
 		case f.Drifted():
 			problems++
 			if len(f.Missing) > 0 {
-				fmt.Printf("! %s: %d keys in .env.example missing from .env:\n", rel, len(f.Missing))
+				fmt.Printf("! %s: %d expected keys missing from .env:\n", rel, len(f.Missing))
 				for _, k := range f.Missing {
 					fmt.Printf("    %s\n", k)
 				}
@@ -89,7 +97,7 @@ func printReport(findings []check.Finding, root string) {
 	if problems == 0 {
 		fmt.Println("\nall clear")
 	} else {
-		fmt.Printf("\n%d service(s) with env drift (inferred from .env.example → warnings only)\n", problems)
+		fmt.Printf("\n%d service(s) with env drift (inferred requirements → warnings only)\n", problems)
 	}
 }
 
