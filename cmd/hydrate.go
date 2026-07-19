@@ -7,13 +7,16 @@ import (
 	"strings"
 
 	"github.com/Blynkosaur/treehouse/internal/check"
+	"github.com/Blynkosaur/treehouse/internal/config"
+	"github.com/Blynkosaur/treehouse/internal/deps"
 	"github.com/Blynkosaur/treehouse/internal/envfile"
 	"github.com/spf13/cobra"
 )
 
 var (
-	hydrateDry bool
-	hydrateCmd = &cobra.Command{
+	hydrateDry      bool
+	hydrateSkipDeps bool
+	hydrateCmd      = &cobra.Command{
 		Use:   "hydrate",
 		Short: "Fill this worktree's .env files from the main checkout",
 		RunE:  runHydrate,
@@ -23,6 +26,7 @@ var (
 func init() {
 	rootCmd.AddCommand(hydrateCmd)
 	hydrateCmd.Flags().BoolVar(&hydrateDry, "dry", false, "show what would change without writing")
+	hydrateCmd.Flags().BoolVar(&hydrateSkipDeps, "skip-deps", false, "only fill .env; skip dependency provisioning")
 }
 
 // runHydrate is a pure adapter (same shape as runDoctor): discover this
@@ -50,9 +54,9 @@ func runHydrate(cmd *cobra.Command, args []string) error {
 	}
 
 	repairs := check.Doctor{}.PlanHydrate(wt, source)
+	// A clean env phase is a note, not an exit: the deps phase below still runs.
 	if len(repairs) == 0 {
 		fmt.Println("nothing to hydrate — every .env already has its keys")
-		return nil
 	}
 
 	for _, r := range repairs {
@@ -84,6 +88,51 @@ func runHydrate(cmd *cobra.Command, args []string) error {
 		// still has to fill them, so name them explicitly.
 		if len(r.Unsourced) > 0 {
 			fmt.Printf("    fill manually (no value in main): %s\n", strings.Join(r.Unsourced, ", "))
+		}
+	}
+
+	return hydrateDeps(root, wt, source, sourceRoot)
+}
+
+// hydrateDeps provisions heavy dependency dirs (node_modules, .venv, …) into
+// this worktree. Rules come from the built-in defaults overlaid with any
+// treehouse.toml in main — the source of truth. All judgment lives in
+// check.PlanDeps; this loop only applies plans and talks to the terminal.
+func hydrateDeps(root string, wt, source check.Worktree, sourceRoot string) error {
+	if hydrateSkipDeps {
+		return nil
+	}
+
+	cfg, _ := config.Load(sourceRoot) // absent/broken config: fall back to defaults
+	rules := config.MergeRules(check.DefaultDepRules(), cfg.Deps)
+
+	plans := check.Doctor{}.PlanDeps(wt, source, rules)
+	if len(plans) == 0 {
+		fmt.Println("deps: nothing to provision")
+		return nil
+	}
+
+	for _, p := range plans {
+		rel := relDir(root, p.Dst)
+
+		switch {
+		case p.Skip != "":
+			fmt.Printf("• %s: skipped (%s)\n", rel, p.Skip)
+		case hydrateDry && p.Action == check.Clone:
+			fmt.Printf("~ %s: would clone\n", rel)
+		case hydrateDry:
+			fmt.Printf("~ %s: would recreate (%s)\n", rel, p.Command)
+		case p.Action == check.Clone:
+			if err := deps.CloneTree(p.Src, p.Dst); err != nil {
+				return fmt.Errorf("%s: %w", rel, err)
+			}
+			fmt.Printf("✓ %s: cloned\n", rel)
+		default:
+			fmt.Printf("~ %s: recreating (%s)\n", rel, p.Command)
+			if err := deps.RunRecreate(filepath.Dir(p.Dst), p.Command); err != nil {
+				return fmt.Errorf("%s: %w", rel, err)
+			}
+			fmt.Printf("✓ %s: recreated\n", rel)
 		}
 	}
 	return nil
