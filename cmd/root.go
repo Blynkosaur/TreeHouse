@@ -7,8 +7,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "th",
-	Short: "Treehouse a Git Worktree manager to make your life easier",
+	Use:     "th",
+	Short:   "Treehouse a Git Worktree manager to make your life easier",
+	Aliases: []string{"th"},
 }
 
 func Execute() {
